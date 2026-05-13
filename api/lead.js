@@ -1,11 +1,7 @@
-const crypto = require('crypto');
-
 const DEFAULT_SITE_URL = 'https://ecomsanz-dropshipping.vercel.app';
-const DEFAULT_LEADS_TABLE = 'leads';
 const DEFAULT_ADMIN_EMAIL = 'ecomsanz01@gmail.com';
 const CALENDLY_URL = 'https://calendly.com/boumharafarhaneismael/30min';
 const VALIDATION_TIMEOUT_MS = 3000;
-const VERIFICATION_TTL_MINUTES = 15;
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
@@ -32,43 +28,6 @@ function timeoutSignal(ms = VALIDATION_TIMEOUT_MS) {
   return { signal: controller.signal, clear: () => clearTimeout(timeout) };
 }
 
-function getSupabaseConfig() {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const tableName = process.env.SUPABASE_LEADS_TABLE || DEFAULT_LEADS_TABLE;
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('SUPABASE_NOT_CONFIGURED');
-  }
-
-  return {
-    supabaseUrl: supabaseUrl.replace(/\/$/, ''),
-    supabaseKey,
-    tableName
-  };
-}
-
-function getVerificationSecret() {
-  return process.env.VERIFICATION_SECRET
-    || process.env.SUPABASE_SERVICE_ROLE_KEY
-    || DEFAULT_ADMIN_EMAIL;
-}
-
-function generateVerificationCode() {
-  return String(crypto.randomInt(100000, 1000000));
-}
-
-function hashVerificationCode({ email, code }) {
-  return crypto
-    .createHmac('sha256', getVerificationSecret())
-    .update(`${normalizeEmail(email)}:${String(code).trim()}`)
-    .digest('hex');
-}
-
-function getVerificationExpiry() {
-  return new Date(Date.now() + VERIFICATION_TTL_MINUTES * 60 * 1000).toISOString();
-}
-
 function escapeHtml(value) {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -76,22 +35,6 @@ function escapeHtml(value) {
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;')
     .replaceAll("'", '&#39;');
-}
-
-async function sendEmailWithResend({ apiKey, from, to, subject, html, text }) {
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ from, to: [to], subject, html, text })
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`RESEND_ERROR_${response.status}: ${body}`);
-  }
 }
 
 async function validateEmailWithAbstract(email) {
@@ -226,173 +169,10 @@ async function sendLeadEmail({ from, to, subject, html, text }) {
     return { provider: 'smtp' };
   }
 
-  const resendKey = process.env.RESEND_API_KEY;
-  if (!resendKey) {
-    return {
-      skipped: true,
-      reason: 'Email service not configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS, or RESEND_API_KEY.'
-    };
-  }
-
-  await sendEmailWithResend({
-    apiKey: resendKey,
-    from,
-    to,
-    subject,
-    html,
-    text
-  });
-  return { provider: 'resend' };
-}
-
-async function saveLeadToSupabase({ name, email, phone }) {
-  const { supabaseUrl, supabaseKey, tableName } = getSupabaseConfig();
-  const endpoint = `${supabaseUrl}/rest/v1/${encodeURIComponent(tableName)}`;
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      apikey: supabaseKey,
-      Authorization: `Bearer ${supabaseKey}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=representation'
-    },
-    body: JSON.stringify({
-      name,
-      email,
-      phone,
-      source: 'masterclass'
-    })
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`SUPABASE_ERROR_${response.status}: ${body}`);
-  }
-
-  const data = await response.json().catch(() => []);
-  return { skipped: false, lead: data[0] || null };
-}
-
-async function updateLeadVerificationInSupabase({ name, email, phone }) {
-  const { supabaseUrl, supabaseKey, tableName } = getSupabaseConfig();
-  const params = new URLSearchParams();
-  params.set('or', `(email.eq.${email},phone.eq.${phone})`);
-
-  const endpoint = `${supabaseUrl}/rest/v1/${encodeURIComponent(tableName)}?${params}`;
-  const response = await fetch(endpoint, {
-    method: 'PATCH',
-    headers: {
-      apikey: supabaseKey,
-      Authorization: `Bearer ${supabaseKey}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=representation'
-    },
-    body: JSON.stringify({
-      name,
-      email,
-      phone,
-      source: 'masterclass'
-    })
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`SUPABASE_UPDATE_ERROR_${response.status}: ${body}`);
-  }
-
-  const data = await response.json().catch(() => []);
-  return { skipped: false, lead: data[0] || null, updated: true };
-}
-
-async function saveOrUpdateLeadVerification(payload) {
-  try {
-    return await saveLeadToSupabase(payload);
-  } catch (error) {
-    if (isSupabaseDuplicateError(error)) {
-      return updateLeadVerificationInSupabase(payload);
-    }
-    throw error;
-  }
-}
-
-async function getLeadByEmail(email) {
-  const { supabaseUrl, supabaseKey, tableName } = getSupabaseConfig();
-  const params = new URLSearchParams({
-    select: 'id,name,email,phone,email_verification_code_hash,email_verification_expires_at',
-    email: `eq.${email}`,
-    limit: '1'
-  });
-
-  const response = await fetch(`${supabaseUrl}/rest/v1/${encodeURIComponent(tableName)}?${params}`, {
-    headers: {
-      apikey: supabaseKey,
-      Authorization: `Bearer ${supabaseKey}`
-    }
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`SUPABASE_SELECT_ERROR_${response.status}: ${body}`);
-  }
-
-  const data = await response.json().catch(() => []);
-  return data[0] || null;
-}
-
-async function markLeadEmailVerified(leadId) {
-  const { supabaseUrl, supabaseKey, tableName } = getSupabaseConfig();
-  const params = new URLSearchParams({ id: `eq.${leadId}` });
-
-  const response = await fetch(`${supabaseUrl}/rest/v1/${encodeURIComponent(tableName)}?${params}`, {
-    method: 'PATCH',
-    headers: {
-      apikey: supabaseKey,
-      Authorization: `Bearer ${supabaseKey}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=representation'
-    },
-    body: JSON.stringify({
-      email_verified_at: new Date().toISOString(),
-      email_verification_code_hash: null,
-      email_verification_expires_at: null
-    })
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`SUPABASE_VERIFY_ERROR_${response.status}: ${body}`);
-  }
-
-  const data = await response.json().catch(() => []);
-  return data[0] || null;
-}
-
-async function verifyLeadEmailCode({ email, code }) {
-  const lead = await getLeadByEmail(email);
-
-  if (!lead?.email_verification_code_hash || !lead?.email_verification_expires_at) {
-    return { ok: false, reason: 'missing_code' };
-  }
-
-  if (new Date(lead.email_verification_expires_at).getTime() < Date.now()) {
-    return { ok: false, reason: 'expired_code' };
-  }
-
-  const expectedHash = Buffer.from(lead.email_verification_code_hash, 'hex');
-  const submittedHash = Buffer.from(hashVerificationCode({ email, code }), 'hex');
-
-  if (expectedHash.length !== submittedHash.length || !crypto.timingSafeEqual(expectedHash, submittedHash)) {
-    return { ok: false, reason: 'invalid_code' };
-  }
-
-  const verifiedLead = await markLeadEmailVerified(lead.id);
-  return { ok: true, lead: verifiedLead || lead };
-}
-
-function isSupabaseDuplicateError(error) {
-  return String(error?.message || error).includes('SUPABASE_ERROR_409')
-    || String(error?.message || error).includes('23505')
-    || String(error?.message || error).toLowerCase().includes('duplicate key');
+  return {
+    skipped: true,
+    reason: 'Email service not configured. Set SMTP_HOST, SMTP_USER and SMTP_PASS.'
+  };
 }
 
 function buildClientEmail({ name, phone }) {
@@ -440,34 +220,6 @@ function buildClientEmail({ name, phone }) {
   };
 }
 
-function buildVerificationEmail({ name, code }) {
-  const safeName = escapeHtml(name);
-  const safeCode = escapeHtml(code);
-
-  return {
-    subject: 'Tu código de acceso a la Masterclass',
-    html: `
-      <div style="font-family:Arial,Helvetica,sans-serif;line-height:1.55;color:#111827;max-width:620px;margin:auto;padding:20px">
-        <h2 style="margin:0 0 12px;color:#111827">Hola ${safeName},</h2>
-        <p style="margin:0 0 12px">Usa este código para confirmar tu email y acceder a la masterclass:</p>
-        <p style="font-size:32px;letter-spacing:8px;font-weight:800;margin:18px 0;color:#111827">${safeCode}</p>
-        <p style="margin:0 0 12px">Este código caduca en ${VERIFICATION_TTL_MINUTES} minutos.</p>
-        <p style="margin:18px 0 0;color:#6b7280;font-size:13px">Si no has solicitado este acceso, puedes ignorar este correo.</p>
-      </div>
-    `,
-    text: [
-      `Hola ${name},`,
-      '',
-      'Usa este código para confirmar tu email y acceder a la masterclass:',
-      code,
-      '',
-      `Este código caduca en ${VERIFICATION_TTL_MINUTES} minutos.`,
-      '',
-      'Equipo Kevin Dropshipping IA'
-    ].join('\n')
-  };
-}
-
 function buildAdminEmail({ name, email, phone }) {
   return {
     subject: `📩 Nuevo lead: ${name}`,
@@ -504,67 +256,9 @@ async function leadHandler(req, res) {
     const adminEmail = process.env.ADMIN_EMAIL || DEFAULT_ADMIN_EMAIL;
 
     if (action === 'confirm') {
-      const code = String(body.code || '').replace(/\D/g, '');
-
-      if (!email || code.length !== 6) {
-        return res.status(400).json({ error: 'Código de verificación inválido.', field: 'code' });
-      }
-
-      const verification = await verifyLeadEmailCode({ email, code });
-
-      if (!verification.ok) {
-        const expired = verification.reason === 'expired_code';
-        return res.status(422).json({
-          error: expired
-            ? 'El código ha caducado. Pide uno nuevo.'
-            : 'El código no es correcto. Revisa tu email e inténtalo de nuevo.',
-          field: 'code',
-          reason: verification.reason
-        });
-      }
-
-      let emailResult = { skipped: false };
-      try {
-        const clientEmail = buildClientEmail({
-          name: verification.lead.name,
-          phone: verification.lead.phone
-        });
-        emailResult = await sendLeadEmail({
-          from: fromEmail,
-          to: verification.lead.email,
-          subject: clientEmail.subject,
-          html: clientEmail.html,
-          text: clientEmail.text
-        });
-
-        if (adminEmail) {
-          const adminPayload = buildAdminEmail({
-            name: verification.lead.name,
-            email: verification.lead.email,
-            phone: verification.lead.phone
-          });
-          await sendLeadEmail({
-            from: fromEmail,
-            to: adminEmail,
-            subject: adminPayload.subject,
-            html: adminPayload.html,
-            text: adminPayload.text
-          });
-        }
-      } catch (emailError) {
-        emailResult.skipped = true;
-        emailResult.error = String(emailError?.message || emailError);
-      }
-
-      return res.status(200).json({
-        ok: true,
-        verified: true,
-        email: emailResult,
-        lead: {
-          name: verification.lead.name,
-          email: verification.lead.email,
-          phone: verification.lead.phone
-        }
+      return res.status(410).json({
+        error: 'La vérification email est désactivée.',
+        field: 'code'
       });
     }
 
@@ -575,11 +269,10 @@ async function leadHandler(req, res) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const supabaseResult = await saveOrUpdateLeadVerification({
-      name,
-      email,
-      phone
-    });
+    const leadResult = {
+      skipped: true,
+      reason: 'Supabase connection disabled.'
+    };
 
     let emailResult = { skipped: false };
     let adminEmailResult = { skipped: true };
@@ -618,7 +311,7 @@ async function leadHandler(req, res) {
       ok: true,
       requiresVerification: false,
       message: 'Acceso concedido.',
-      supabase: supabaseResult,
+      leadStorage: leadResult,
       email: emailResult,
       adminEmail: adminEmailResult
     });

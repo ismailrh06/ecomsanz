@@ -659,70 +659,32 @@ if (form) {
     const phoneLocal = phoneInput?.value.trim() || '';
     const phone = `${phoneCode}${phoneLocal.replace(/\D/g, '')}`;
     const btn = form.querySelector('button[type="submit"]');
-    const originalHtml = btn.innerHTML;
-
-    if (!name) {
-      showError('Por favor, introduce tu nombre.');
-      nameInput?.focus();
-      return;
-    }
-
-    if (!isValidName(name)) {
-      showError('El nombre no puede contener números.');
-      nameInput?.focus();
-      return;
-    }
-
-    if (!email || !isValidEmail(email)) {
-      showError('Por favor, introduce un email válido.');
-      emailInput?.focus();
-      return;
-    }
-
-    if (!phoneLocal || !isValidPhoneLocal(phoneLocal) || !isValidPhone(phone)) {
-      showError('Por favor, introduce un teléfono válido con prefijo si es necesario.');
-      phoneInput?.focus();
-      return;
-    }
 
     hideError();
 
-    btn.innerHTML = 'ACCEDIENDO...';
-    btn.disabled = true;
-    btn.style.opacity = '.9';
+    if (btn) {
+      btn.innerHTML = 'ACCEDIENDO...';
+      btn.disabled = true;
+      btn.style.opacity = '.9';
+    }
 
     try {
-      const response = await fetch('/api/lead', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, phone })
-      });
-      const result = await response.json().catch(() => ({}));
-
-      if (!response.ok || result.ok === false) {
-        throw new Error(result.error || result.message || 'No se pudo enviar el formulario.');
-      }
-
       const leads = JSON.parse(localStorage.getItem('leads') || '[]');
       leads.push({ name, email, phone, date: new Date().toISOString() });
       localStorage.setItem('leads', JSON.stringify(leads));
       localStorage.setItem('masterclassAccess', 'verified');
-
-      if (typeof fbq !== 'undefined') {
-        fbq('track', 'Lead', {
-          content_name: 'Masterclass Dropshipping IA',
-          status: 'submitted'
-        });
-      }
-
-      window.location.href = 'masterclass.html';
-    } catch (error) {
-      showError(error?.message || 'No se pudo continuar. Inténtalo de nuevo.');
-      btn.innerHTML = originalHtml;
-      btn.disabled = false;
-      btn.style.opacity = '';
-      return;
+    } catch (storageError) {
+      console.warn('Could not save lead locally.', storageError);
     }
+
+    if (typeof fbq !== 'undefined') {
+      fbq('track', 'Lead', {
+        content_name: 'Masterclass Dropshipping IA',
+        status: 'submitted'
+      });
+    }
+
+    window.location.href = 'masterclass.html';
   });
 }
 
