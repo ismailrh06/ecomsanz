@@ -1876,12 +1876,14 @@ ul { list-style: none; }
 }
 
 .sv-item.sv-local {
-  aspect-ratio: 9 / 16;
+  /* Ensure student videos use a landscape 16:9 frame for consistency */
+  aspect-ratio: 16 / 9;
   background: #000;
 }
 
 .sv-item.sv-local video {
-  object-fit: contain;
+  /* Fill the video element and crop excess to maintain consistent cards */
+  object-fit: cover;
 }
 
 .sv-item.playing .sv-placeholder {

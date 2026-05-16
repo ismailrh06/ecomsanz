@@ -60,6 +60,8 @@
           autoplay
           playsinline
           preload="auto"
+          tabindex="0"
+          aria-label="Masterclass video"
         >
           <source src="https://pub-b63eac3da6104191997487716551c2fa.r2.dev/VSL-optimized.mp4" type="video/mp4" />
           Tu navegador no soporta video HTML5.
@@ -197,6 +199,32 @@
   <footer class="site-footer">
     <p>© 2026 Kevin Dropshipping IA — Todos los derechos reservados.</p>
   </footer>
+
+  <script>
+    (function () {
+      if (!document.body.classList.contains('masterclass-body')) return;
+
+      function focusMainVideo() {
+        const v = document.getElementById('mainVideo');
+        if (!v) return;
+        try {
+          if (!v.hasAttribute('tabindex')) v.setAttribute('tabindex', '0');
+          v.focus({ preventScroll: true });
+        } catch (e) {
+          try { v.focus(); } catch (err) {}
+        }
+        setTimeout(() => {
+          v.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 80);
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', focusMainVideo, { once: true });
+      } else {
+        focusMainVideo();
+      }
+    })();
+  </script>
 
   <script src="/script.js?v=2"></script>
 </body>
