@@ -1,7 +1,6 @@
 const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
-require('dotenv').config();
 
 const PORT = Number(process.env.PORT || 3000);
 const ROOT = __dirname;
@@ -71,21 +70,20 @@ const server = http.createServer(async (req, res) => {
       const email = String(body.email || '').trim();
       const phone = String(body.phone || '').trim();
 
-      if (!name || !email || !phone) {
-        return sendJson(res, 400, { ok: false, error: 'Missing required fields' });
+      if (!name) {
+        return sendJson(res, 400, { ok: false, error: 'Missing required fields', field: 'name' });
       }
 
       return sendJson(res, 200, {
         ok: true,
         requiresVerification: false,
-        message: 'Lead reçu.',
+        message: 'Acceso concedido.',
         lead: { name, email, phone }
       });
     } catch (error) {
-      console.error('Server error:', error);
       return sendJson(res, 500, {
         ok: false,
-        error: 'Server error',
+        error: 'Local API error',
         details: String(error?.message || error)
       });
     }
