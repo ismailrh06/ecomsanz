@@ -666,9 +666,11 @@ if (form) {
 
     hideError();
 
-    btn.innerHTML = 'ACCEDIENDO...';
-    btn.disabled = true;
-    btn.style.opacity = '.9';
+    if (btn) {
+      btn.innerHTML = 'ACCEDIENDO...';
+      btn.disabled = true;
+      btn.style.opacity = '.9';
+    }
 
     try {
       const leads = JSON.parse(localStorage.getItem('leads') || '[]');
