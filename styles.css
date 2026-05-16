@@ -1761,44 +1761,77 @@ ul { list-style: none; }
 }
 
 .student-videos-shell {
+  position: relative;
   display: grid;
-  grid-template-columns: 48px minmax(260px, 420px) 48px;
   align-items: center;
   justify-content: center;
-  gap: 18px;
+  isolation: isolate;
+  padding: 4px 62px 0;
 }
 
 .student-videos-grid {
-  display: grid;
-  grid-template-columns: minmax(260px, 420px);
-  justify-content: center;
-  gap: 0;
+  width: min(100%, 1040px);
+  display: flex;
+  align-items: center;
+  gap: clamp(14px, 2vw, 22px);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 14px max(24px, calc((100% - clamp(282px, 31vw, 360px)) / 2)) 22px;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: max(24px, calc((100% - clamp(282px, 31vw, 360px)) / 2));
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  mask-image: linear-gradient(90deg, transparent 0, #000 8%, #000 92%, transparent 100%);
+}
+
+.student-videos-grid::-webkit-scrollbar {
+  display: none;
 }
 
 .video-arrow {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
-  border: 1px solid rgba(125,211,252,0.36);
+  width: 54px;
+  height: 54px;
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  border: 1px solid rgba(186,230,253,0.42);
   border-radius: 50%;
-  background: rgba(5, 16, 28, 0.88);
+  background:
+    linear-gradient(145deg, rgba(224,247,255,0.14), rgba(14,165,233,0.10)),
+    rgba(4, 13, 24, 0.92);
   color: var(--sky-3);
-  font-size: 2.1rem;
+  font-size: 2.15rem;
   line-height: 1;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 12px 28px rgba(0,0,0,0.32);
-  transition: background .18s ease, border-color .18s ease, transform .18s ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.12),
+    0 18px 42px rgba(0,0,0,0.44),
+    0 0 0 7px rgba(125,211,252,0.045);
+  transform: translateY(-50%);
+  transition: background .22s ease, border-color .22s ease, transform .22s ease, box-shadow .22s ease;
 }
 
+.video-arrow-prev { left: 0; }
+.video-arrow-next { right: 0; }
+
 .video-arrow:hover {
-  transform: translateY(-2px);
-  border-color: rgba(125,211,252,0.68);
-  background: rgba(8, 28, 48, 0.96);
+  transform: translateY(calc(-50% - 2px));
+  border-color: rgba(186,230,253,0.72);
+  background:
+    linear-gradient(145deg, rgba(224,247,255,0.20), rgba(14,165,233,0.16)),
+    rgba(7, 24, 42, 0.98);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.16),
+    0 22px 52px rgba(0,0,0,0.52),
+    0 0 32px rgba(125,211,252,0.14);
 }
 
 .video-arrow:active {
-  transform: translateY(0) scale(0.96);
+  transform: translateY(-50%) scale(0.96);
 }
 
 .student-videos-section .video-tracker {
@@ -1806,22 +1839,39 @@ ul { list-style: none; }
 }
 
 .student-videos-grid .sv-item {
-  display: none;
-}
-
-.student-videos-grid .sv-item.is-active {
   display: block;
 }
 
 .sv-item {
   position: relative;
-  aspect-ratio: 16 / 9;
+  flex: 0 0 clamp(238px, 25vw, 300px);
+  aspect-ratio: 9 / 16;
   overflow: hidden;
-  border-radius: 22px;
+  border-radius: 24px;
   border: 1px solid var(--line);
-  background: #030813;
+  background:
+    radial-gradient(circle at 50% 8%, rgba(125,211,252,0.12), transparent 42%),
+    #030813;
   cursor: pointer;
-  transition: border-color .25s, box-shadow .25s;
+  scroll-snap-align: center;
+  opacity: 0.52;
+  transform: scale(0.92);
+  box-shadow:
+    0 20px 46px rgba(0,0,0,0.34),
+    inset 0 1px 0 rgba(255,255,255,0.06);
+  transition: opacity .28s ease, transform .28s ease, border-color .28s ease, box-shadow .28s ease, filter .28s ease;
+}
+
+.student-videos-grid .sv-item.is-active {
+  flex-basis: clamp(282px, 31vw, 360px);
+  opacity: 1;
+  transform: scale(1);
+  border-color: rgba(186,230,253,0.58);
+  box-shadow:
+    0 28px 74px rgba(0,0,0,0.58),
+    0 0 0 1px rgba(125,211,252,0.16),
+    0 0 44px rgba(125,211,252,0.10),
+    inset 0 1px 0 rgba(255,255,255,0.12);
 }
 
 .sv-video {
@@ -1833,8 +1883,14 @@ ul { list-style: none; }
 }
 
 .sv-item:hover {
+  opacity: 1;
+  transform: scale(0.96) translateY(-2px);
   border-color: var(--line-strong);
-  box-shadow: 0 20px 55px rgba(0,0,0,0.48);
+  box-shadow: 0 24px 62px rgba(0,0,0,0.5);
+}
+
+.student-videos-grid .sv-item.is-active:hover {
+  transform: scale(1) translateY(-2px);
 }
 
 .sv-placeholder {
@@ -1876,13 +1932,11 @@ ul { list-style: none; }
 }
 
 .sv-item.sv-local {
-  /* Ensure student videos use a landscape 16:9 frame for consistency */
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 9 / 16;
   background: #000;
 }
 
 .sv-item.sv-local video {
-  /* Fill the video element and crop excess to maintain consistent cards */
   object-fit: cover;
 }
 
@@ -2035,7 +2089,10 @@ body.chatbot-open { overflow: hidden; touch-action: none; }
   .keys-grid { grid-template-columns: 1fr; }
   .contact-grid { grid-template-columns: 1fr; }
   .proof-item { flex-basis: calc((100% - 16px) / 2); }
-  .student-videos-grid { grid-template-columns: repeat(2, 1fr); }
+  .student-videos-shell { padding-inline: 54px; }
+  .student-videos-grid {
+    width: min(100%, 780px);
+  }
 }
 
 @media (max-width: 640px) {
@@ -2203,6 +2260,7 @@ body.chatbot-open { overflow: hidden; touch-action: none; }
 
   .student-videos-shell {
     display: block;
+    padding: 0;
   }
 
   .video-arrow {
@@ -2210,7 +2268,7 @@ body.chatbot-open { overflow: hidden; touch-action: none; }
   }
 
   .student-videos-grid {
-    --student-video-width: min(86vw, 420px);
+    --student-video-width: min(78vw, 330px);
     display: flex;
     flex-wrap: nowrap;
     gap: 14px;
@@ -2226,6 +2284,7 @@ body.chatbot-open { overflow: hidden; touch-action: none; }
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    mask-image: none;
   }
 
   .student-videos-grid::-webkit-scrollbar { display: none; }
@@ -2237,12 +2296,21 @@ body.chatbot-open { overflow: hidden; touch-action: none; }
   .sv-item {
     flex: 0 0 var(--student-video-width);
     max-width: var(--student-video-width);
+    aspect-ratio: 9 / 16;
+    opacity: 1;
+    transform: none;
     scroll-snap-align: center;
     scroll-snap-stop: normal;
     animation: none;
   }
 
+  .student-videos-grid .sv-item.is-active {
+    flex-basis: var(--student-video-width);
+    transform: none;
+  }
+
   .sv-item:hover {
+    transform: none;
     box-shadow: 0 20px 55px rgba(0,0,0,0.48);
   }
 

@@ -288,14 +288,28 @@ document.querySelectorAll('.smooth-scroll, a[href^="#"]').forEach((link) => {
     activeIndex = (index + items.length) % items.length;
     items.forEach((item, itemIndex) => {
       const isActive = itemIndex === activeIndex;
+      const video = item.querySelector('video');
       item.classList.toggle('is-active', isActive);
-      if (!isActive) item.querySelector('video')?.pause();
+      if (isActive) {
+        video?.play().catch(() => {});
+      } else {
+        video?.pause();
+      }
     });
     dots.forEach((dot, dotIndex) => dot.classList.toggle('active', dotIndex === activeIndex));
+    items[activeIndex]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
   };
 
   prevButton.addEventListener('click', () => setActive(activeIndex - 1));
   nextButton.addEventListener('click', () => setActive(activeIndex + 1));
+
+  items.forEach((item, index) => {
+    item.addEventListener('click', (event) => {
+      if (!desktopQuery.matches || index === activeIndex) return;
+      event.preventDefault();
+      setActive(index);
+    });
+  });
 
   dots.forEach((dot, index) => {
     dot.addEventListener('click', () => setActive(index));
@@ -322,11 +336,11 @@ document.querySelectorAll('.smooth-scroll, a[href^="#"]').forEach((link) => {
     video.setAttribute('playsinline', '');
 
     if (role === 'alumnos') {
-      video.muted = false;
-      video.defaultMuted = false;
-      video.autoplay = false;
-      video.removeAttribute('autoplay');
-      video.removeAttribute('muted');
+      video.muted = true;
+      video.defaultMuted = true;
+      video.autoplay = true;
+      video.setAttribute('autoplay', '');
+      video.setAttribute('muted', '');
       video.loop = true;
       video.controls = true;
       video.volume = 1;
@@ -431,6 +445,10 @@ document.querySelectorAll('.smooth-scroll, a[href^="#"]').forEach((link) => {
     });
 
     observer.observe(video);
+
+    if (video.dataset.videoRole === 'alumnos' && video.closest('.sv-item.is-active')) {
+      video.play().catch(() => {});
+    }
   });
 
   document.addEventListener('visibilitychange', () => {

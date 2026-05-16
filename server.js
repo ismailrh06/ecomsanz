@@ -26,12 +26,27 @@ function sendJson(res, statusCode, payload) {
 }
 
 function getFilePath(urlPath) {
-  const cleanPath = decodeURIComponent(urlPath.split('?')[0]);
+  let cleanPath = '/';
+  try {
+    cleanPath = decodeURIComponent(urlPath.split('?')[0]);
+  } catch (error) {
+    return null;
+  }
+
   if (cleanPath === '/') return path.join(ROOT, 'index.html');
-  return path.join(ROOT, cleanPath);
+
+  const filePath = path.normalize(path.join(ROOT, cleanPath));
+  if (!filePath.startsWith(ROOT + path.sep)) return null;
+  return filePath;
 }
 
 function serveFile(res, filePath) {
+  if (!filePath) {
+    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Bad request');
+    return;
+  }
+
   fs.readFile(filePath, (err, data) => {
     if (err) {
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -62,7 +77,9 @@ function readRequestBody(req) {
 }
 
 const server = http.createServer(async (req, res) => {
-  if (req.method === 'POST' && req.url.startsWith('/api/lead')) {
+  const requestUrl = req.url || '/';
+
+  if (req.method === 'POST' && requestUrl.startsWith('/api/lead')) {
     try {
       const rawBody = await readRequestBody(req);
       const body = rawBody ? JSON.parse(rawBody) : {};
@@ -95,7 +112,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const filePath = getFilePath(req.url || '/');
+  const filePath = getFilePath(requestUrl);
   serveFile(res, filePath);
 });
 
