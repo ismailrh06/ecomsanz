@@ -37,6 +37,10 @@ function getFilePath(urlPath) {
 
   const filePath = path.normalize(path.join(ROOT, cleanPath));
   if (!filePath.startsWith(ROOT + path.sep)) return null;
+  if (!path.extname(filePath)) {
+    const htmlPath = `${filePath}.html`;
+    if (fs.existsSync(htmlPath)) return htmlPath;
+  }
   return filePath;
 }
 

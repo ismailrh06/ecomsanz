@@ -34,9 +34,14 @@ function getFilePath(urlPath) {
   }
 
   if (cleanPath === '/') return path.join(ROOT, 'index.html');
+  if (cleanPath === '/masterclass') return path.join(ROOT, 'masterclass.html');
 
   const filePath = path.normalize(path.join(ROOT, cleanPath));
   if (!filePath.startsWith(ROOT + path.sep)) return null;
+  if (!path.extname(filePath)) {
+    const htmlPath = `${filePath}.html`;
+    if (fs.existsSync(htmlPath)) return htmlPath;
+  }
   return filePath;
 }
 
@@ -117,5 +122,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Local server running at http://localhost:${PORT}`);
+  console.log(`Server running at http://localhost:${PORT}`);
 });

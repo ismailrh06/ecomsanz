@@ -1536,6 +1536,17 @@ ul { list-style: none; }
   margin-top: 10px;
 }
 
+.video-section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 30%, rgba(125,211,252,0.18), transparent 54%),
+    linear-gradient(180deg, rgba(224,247,255,0.05), transparent 34%);
+  opacity: 0.9;
+}
+
 .mc-hero-meta {
   display: flex;
   justify-content: center;
@@ -1577,9 +1588,38 @@ ul { list-style: none; }
   aspect-ratio: 16 / 9;
   overflow: hidden;
   border-radius: 24px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid rgba(186,230,253,0.5);
   background: #000;
-  box-shadow: 0 30px 80px rgba(0,0,0,0.72), 0 0 0 1px rgba(125,211,252,0.12);
+  box-shadow:
+    0 30px 80px rgba(0,0,0,0.72),
+    0 0 0 1px rgba(125,211,252,0.12),
+    0 0 46px rgba(125,211,252,0.12);
+  isolation: isolate;
+}
+
+.video-frame-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.18),
+    inset 0 0 0 1px rgba(255,255,255,0.04);
+}
+
+.video-frame-wrap::after {
+  content: "";
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: -2px;
+  height: 2px;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(224,247,255,0.86), rgba(125,211,252,0.7), transparent);
+  box-shadow: 0 0 24px rgba(125,211,252,0.54);
 }
 
 .video-frame-wrap iframe,
@@ -2096,6 +2136,17 @@ body.chatbot-open { overflow: hidden; touch-action: none; }
 }
 
 @media (max-width: 640px) {
+  .masterclass-body {
+    background:
+      radial-gradient(520px 280px at 50% -40px, rgba(125,211,252,0.18), transparent 72%),
+      #02050a;
+  }
+
+  .masterclass-body .container-wide,
+  .masterclass-body .container-narrow {
+    width: calc(100% - 14px);
+  }
+
   .topbar { padding-top: 16px; }
   .topbar-cta { display: none; }
   .hero-section { padding-top: 30px; }
@@ -2134,6 +2185,27 @@ body.chatbot-open { overflow: hidden; touch-action: none; }
   .proof-section,
   .student-videos-section,
   .final-cta { border-radius: 22px; padding: 20px; }
+
+  .masterclass-body .section-heading {
+    margin-bottom: 16px;
+  }
+
+  .masterclass-body .section-heading h2,
+  .masterclass-body .final-cta h2 {
+    font-size: clamp(1.55rem, 8vw, 2.3rem);
+    line-height: 1;
+    letter-spacing: -0.025em;
+  }
+
+  .masterclass-body .eyebrow {
+    margin-bottom: 10px;
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+  }
+
+  .masterclass-body .eyebrow span {
+    width: 22px;
+  }
   .faq-item,
   .contact-card {
     border-radius: 18px;
@@ -2195,6 +2267,20 @@ body.chatbot-open { overflow: hidden; touch-action: none; }
   .form-head { align-items: flex-start; flex-direction: column; gap: 4px; }
   .proof-section { overflow: hidden; }
 
+  .masterclass-body .proof-section,
+  .masterclass-body .student-videos-section,
+  .masterclass-body .final-cta {
+    margin-bottom: 14px;
+    padding: 18px 10px 20px;
+    border-radius: 20px;
+    background:
+      linear-gradient(155deg, rgba(224,247,255,0.07), transparent 35%),
+      linear-gradient(180deg, rgba(8,24,40,0.94), rgba(2,6,12,0.96));
+    box-shadow:
+      0 18px 48px rgba(0,0,0,0.46),
+      inset 0 1px 0 rgba(255,255,255,0.08);
+  }
+
   .proof-shell {
     display: block;
     padding-inline: 0;
@@ -2207,16 +2293,16 @@ body.chatbot-open { overflow: hidden; touch-action: none; }
   .proof-masonry {
     display: flex;
     flex-wrap: nowrap;
-    gap: 14px;
+    gap: 12px;
     overflow-x: auto;
     overflow-y: hidden;
-    padding: 4px 2px 14px;
-    scroll-snap-type: x mandatory;
-    scroll-snap-stop: always;
-    scroll-padding-inline: 16px;
+    padding: 4px 6px 14px;
+    scroll-snap-type: x proximity;
+    scroll-snap-stop: normal;
+    scroll-padding-inline: 18px;
     scroll-behavior: smooth;
-    overscroll-behavior-x: contain;
-    touch-action: pan-x;
+    overscroll-behavior-x: auto;
+    touch-action: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -2225,7 +2311,7 @@ body.chatbot-open { overflow: hidden; touch-action: none; }
   .proof-masonry::-webkit-scrollbar { display: none; }
 
   .proof-item {
-    flex: 0 0 clamp(220px, 76vw, 290px);
+    flex: 0 0 clamp(210px, 70vw, 276px);
     max-width: none;
     margin-bottom: 0;
     scroll-snap-align: center;
@@ -2234,6 +2320,9 @@ body.chatbot-open { overflow: hidden; touch-action: none; }
     will-change: transform;
     backface-visibility: hidden;
     transform: translateZ(0);
+    border-radius: 16px;
+    border-color: rgba(125,211,252,0.26);
+    box-shadow: 0 16px 34px rgba(0,0,0,0.34);
   }
 
   .proof-item img {
@@ -2256,10 +2345,13 @@ body.chatbot-open { overflow: hidden; touch-action: none; }
     display: flex;
   }
 
-  .student-videos-section { overflow: hidden; }
+  .student-videos-section {
+    overflow: hidden;
+  }
 
   .student-videos-shell {
     display: block;
+    margin-inline: -10px;
     padding: 0;
   }
 
@@ -2268,23 +2360,24 @@ body.chatbot-open { overflow: hidden; touch-action: none; }
   }
 
   .student-videos-grid {
-    --student-video-width: min(78vw, 330px);
+    --student-video-width: min(72vw, 292px);
     display: flex;
     flex-wrap: nowrap;
-    gap: 14px;
+    align-items: center;
+    gap: 12px;
     overflow-x: auto;
     overflow-y: hidden;
-    padding: 4px max(12px, calc((100% - var(--student-video-width)) / 2)) 14px;
-    scroll-snap-type: x mandatory;
+    padding: 8px max(14px, calc((100% - var(--student-video-width)) / 2)) 18px;
+    scroll-snap-type: x proximity;
     scroll-snap-stop: normal;
     scroll-padding-inline: max(12px, calc((100% - var(--student-video-width)) / 2));
     scroll-behavior: smooth;
-    touch-action: pan-x;
-    overscroll-behavior-x: contain;
+    touch-action: auto;
+    overscroll-behavior-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     -ms-overflow-style: none;
-    mask-image: none;
+    mask-image: linear-gradient(90deg, transparent 0, #000 7%, #000 93%, transparent 100%);
   }
 
   .student-videos-grid::-webkit-scrollbar { display: none; }
@@ -2297,16 +2390,27 @@ body.chatbot-open { overflow: hidden; touch-action: none; }
     flex: 0 0 var(--student-video-width);
     max-width: var(--student-video-width);
     aspect-ratio: 9 / 16;
-    opacity: 1;
-    transform: none;
+    opacity: 0.72;
+    transform: scale(0.94);
     scroll-snap-align: center;
     scroll-snap-stop: normal;
     animation: none;
+    border-radius: 22px;
+    border-color: rgba(125,211,252,0.26);
+    box-shadow:
+      0 16px 36px rgba(0,0,0,0.36),
+      inset 0 1px 0 rgba(255,255,255,0.07);
   }
 
   .student-videos-grid .sv-item.is-active {
     flex-basis: var(--student-video-width);
-    transform: none;
+    opacity: 1;
+    transform: scale(1);
+    border-color: rgba(224,247,255,0.58);
+    box-shadow:
+      0 22px 54px rgba(0,0,0,0.54),
+      0 0 0 1px rgba(125,211,252,0.16),
+      0 0 34px rgba(125,211,252,0.12);
   }
 
   .sv-item:hover {
@@ -2318,22 +2422,76 @@ body.chatbot-open { overflow: hidden; touch-action: none; }
     flex: 0 0 var(--student-video-width);
   }
 
-  .cta-row { flex-direction: column; }
+  .masterclass-body .video-tracker,
+  .masterclass-body .proof-tracker {
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .masterclass-body .video-dot,
+  .masterclass-body .proof-dot {
+    width: 7px;
+    height: 7px;
+    border-color: rgba(224,247,255,0.34);
+    background: rgba(255,255,255,0.16);
+  }
+
+  .masterclass-body .video-dot.active,
+  .masterclass-body .proof-dot.active {
+    width: 22px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--sky-3), var(--sky));
+    box-shadow: 0 0 18px rgba(125,211,252,0.38);
+  }
+
+  .cta-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+
   .btn-primary, .btn-secondary, .btn-whatsapp { width: 100%; }
+
+  .masterclass-body .btn-xl,
+  .masterclass-body .btn-whatsapp {
+    min-height: 48px;
+    padding: 13px 16px;
+    border-radius: 14px;
+    font-size: 0.72rem;
+    letter-spacing: 0.055em;
+  }
+
   .video-title { font-size: clamp(2.2rem, 12vw, 4rem); }
 
   .masterclass-body .video-section {
-    width: 100%;
-    padding: 14px 6px 18px;
-    border-radius: 18px;
+    width: calc(100% - 6px);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding: 12px 5px 20px;
+    border-radius: 22px;
+    margin-top: 0;
+    margin-bottom: 14px;
+    border-color: rgba(186,230,253,0.28);
+    background:
+      radial-gradient(420px 220px at 50% 22%, rgba(125,211,252,0.16), transparent 64%),
+      linear-gradient(180deg, rgba(8,24,40,0.96), rgba(1,5,10,0.98));
+    box-shadow:
+      0 18px 54px rgba(0,0,0,0.52),
+      inset 0 1px 0 rgba(255,255,255,0.08);
   }
 
   .masterclass-body .video-frame-wrap {
     width: calc(100vw - 12px);
     max-width: none;
-    margin: 0 auto 18px;
+    margin: 0 auto 14px;
     aspect-ratio: 16 / 9;
-    border-radius: 14px;
+    border-radius: 20px;
+    border-color: rgba(224,247,255,0.58);
+    box-shadow:
+      0 20px 48px rgba(0,0,0,0.76),
+      0 0 0 1px rgba(125,211,252,0.16),
+      0 0 38px rgba(125,211,252,0.18);
   }
 
   .masterclass-body .masterclass-video {
@@ -2354,15 +2512,27 @@ body.chatbot-open { overflow: hidden; touch-action: none; }
   }
 
   .masterclass-body .video-title {
-    max-width: 620px;
-    font-size: clamp(1.35rem, 6.8vw, 2rem);
-    line-height: 1.08;
-    margin-bottom: 10px;
-    letter-spacing: -0.03em;
+    max-width: 94%;
+    font-size: clamp(1.18rem, 5.7vw, 1.74rem);
+    line-height: 1.05;
+    margin-bottom: 14px;
+    letter-spacing: 0;
+    text-shadow: 0 12px 32px rgba(0,0,0,0.62);
   }
 
   .masterclass-body .cta-row {
-    gap: 10px;
+    width: calc(100% - 14px);
+    margin-inline: auto;
+  }
+
+  .masterclass-body .final-cta {
+    padding: 24px 14px 26px;
+  }
+
+  .masterclass-body .mc-cta-copy {
+    margin-bottom: 18px;
+    font-size: 0.92rem;
+    line-height: 1.6;
   }
 
   .chatbot-widget { right: 10px; bottom: 10px; }

@@ -2,6 +2,17 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
   "trailingSlash": false,
+  "rewrites": [
+    {
+      "source": "/masterclass",
+      "destination": "/masterclass.html"
+    }
+  ],
+  "functions": {
+    "server.js": {
+      "includeFiles": "{index.html,masterclass.html,styles.css,script.js,photos/**}"
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",

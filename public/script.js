@@ -102,6 +102,49 @@ document.querySelectorAll('.smooth-scroll, a[href^="#"]').forEach((link) => {
   });
 });
 
+function getFullscreenElement() {
+  return document.fullscreenElement
+    || document.webkitFullscreenElement
+    || document.mozFullScreenElement
+    || document.msFullscreenElement
+    || null;
+}
+
+function exitFullscreenMode() {
+  if (document.exitFullscreen) return document.exitFullscreen();
+  if (document.webkitExitFullscreen) return document.webkitExitFullscreen();
+  if (document.mozCancelFullScreen) return document.mozCancelFullScreen();
+  if (document.msExitFullscreen) return document.msExitFullscreen();
+  return Promise.resolve();
+}
+
+function enterVideoFullscreen(video) {
+  if (!video) return Promise.resolve();
+
+  if (video.requestFullscreen) return video.requestFullscreen();
+  if (video.webkitRequestFullscreen) return video.webkitRequestFullscreen();
+  if (video.webkitEnterFullscreen) {
+    video.webkitEnterFullscreen();
+    return Promise.resolve();
+  }
+  if (video.mozRequestFullScreen) return video.mozRequestFullScreen();
+  if (video.msRequestFullscreen) return video.msRequestFullscreen();
+
+  return Promise.resolve();
+}
+
+function toggleVideoFullscreen(video) {
+  if (!video) return;
+
+  const fullscreenElement = getFullscreenElement();
+  if (fullscreenElement) {
+    exitFullscreenMode().catch(() => {});
+    return;
+  }
+
+  enterVideoFullscreen(video).catch(() => {});
+}
+
 /* ============================================================
    MOBILE CAROUSEL TRACKERS
    ============================================================ */
@@ -127,11 +170,7 @@ document.querySelectorAll('.smooth-scroll, a[href^="#"]').forEach((link) => {
         items.forEach((item, itemIndex) => {
           const video = item.querySelector('video');
           if (!video) return;
-          if (itemIndex === normalized) {
-            video.play().catch(() => {});
-          } else {
-            video.pause();
-          }
+          if (itemIndex !== normalized) video.pause();
         });
       }
     };
@@ -139,7 +178,9 @@ document.querySelectorAll('.smooth-scroll, a[href^="#"]').forEach((link) => {
     const scrollToItem = (index, behavior = 'smooth') => {
       const item = items[index];
       if (!item) return;
-      item.scrollIntoView({ behavior, inline: 'center', block: 'nearest' });
+      const itemLeft = item.offsetLeft;
+      const targetLeft = itemLeft - (track.clientWidth - item.clientWidth) / 2;
+      track.scrollTo({ left: Math.max(0, targetLeft), behavior });
       setActive(index);
     };
 
@@ -160,7 +201,7 @@ document.querySelectorAll('.smooth-scroll, a[href^="#"]').forEach((link) => {
 
     const onScrollEnd = () => {
       const closest = getClosestIndex();
-      scrollToItem(closest);
+      setActive(closest);
     };
 
     const onScroll = () => {
@@ -184,9 +225,8 @@ document.querySelectorAll('.smooth-scroll, a[href^="#"]').forEach((link) => {
     }, { passive: true });
 
     window.addEventListener('resize', updateFromScroll, { passive: true });
-    window.addEventListener('load', () => scrollToItem(0, 'auto'), { once: true });
-
-    scrollToItem(0, 'auto');
+    window.addEventListener('load', () => setActive(0), { once: true });
+    setActive(0);
   }
 
   setupCarouselTracker('.proof-masonry', '.proof-dot', '.proof-item');
@@ -283,21 +323,25 @@ document.querySelectorAll('.smooth-scroll, a[href^="#"]').forEach((link) => {
 
   let activeIndex = Math.max(0, items.findIndex((item) => item.classList.contains('is-active')));
 
-  const setActive = (index) => {
+  const centerActiveItem = (behavior = 'smooth') => {
+    const item = items[activeIndex];
+    const track = item?.parentElement;
+    if (!item || !track) return;
+    const targetLeft = item.offsetLeft - (track.clientWidth - item.clientWidth) / 2;
+    track.scrollTo({ left: Math.max(0, targetLeft), behavior });
+  };
+
+  const setActive = (index, shouldCenter = true) => {
     if (!desktopQuery.matches) return;
     activeIndex = (index + items.length) % items.length;
     items.forEach((item, itemIndex) => {
       const isActive = itemIndex === activeIndex;
       const video = item.querySelector('video');
       item.classList.toggle('is-active', isActive);
-      if (isActive) {
-        video?.play().catch(() => {});
-      } else {
-        video?.pause();
-      }
+      if (!isActive) video?.pause();
     });
     dots.forEach((dot, dotIndex) => dot.classList.toggle('active', dotIndex === activeIndex));
-    items[activeIndex]?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    if (shouldCenter) centerActiveItem();
   };
 
   prevButton.addEventListener('click', () => setActive(activeIndex - 1));
@@ -308,6 +352,7 @@ document.querySelectorAll('.smooth-scroll, a[href^="#"]').forEach((link) => {
       if (!desktopQuery.matches || index === activeIndex) return;
       event.preventDefault();
       setActive(index);
+      toggleVideoFullscreen(item.querySelector('video[data-video-role="alumnos"]'));
     });
   });
 
@@ -315,8 +360,39 @@ document.querySelectorAll('.smooth-scroll, a[href^="#"]').forEach((link) => {
     dot.addEventListener('click', () => setActive(index));
   });
 
-  desktopQuery.addEventListener('change', () => setActive(activeIndex));
-  setActive(activeIndex);
+  desktopQuery.addEventListener('change', () => setActive(activeIndex, false));
+  setActive(activeIndex, false);
+})();
+
+/* ============================================================
+   STUDENT VIDEO FULLSCREEN
+   ============================================================ */
+(function () {
+  const items = Array.from(document.querySelectorAll('.student-videos-grid .sv-item'));
+  if (!items.length) return;
+
+  const dots = Array.from(document.querySelectorAll('.student-videos-section .video-dot'));
+
+  const activateItem = (targetItem) => {
+    items.forEach((item, index) => {
+      const isActive = item === targetItem;
+      item.classList.toggle('is-active', isActive);
+      dots[index]?.classList.toggle('active', isActive);
+      if (!isActive) item.querySelector('video')?.pause();
+    });
+  };
+
+  items.forEach((item) => {
+    const video = item.querySelector('video[data-video-role="alumnos"]');
+    if (!video) return;
+
+    video.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      activateItem(item);
+      toggleVideoFullscreen(video);
+    });
+  });
 })();
 
 /* ============================================================
@@ -336,11 +412,11 @@ document.querySelectorAll('.smooth-scroll, a[href^="#"]').forEach((link) => {
     video.setAttribute('playsinline', '');
 
     if (role === 'alumnos') {
-      video.muted = true;
-      video.defaultMuted = true;
-      video.autoplay = true;
-      video.setAttribute('autoplay', '');
-      video.setAttribute('muted', '');
+      video.muted = false;
+      video.defaultMuted = false;
+      video.autoplay = false;
+      video.removeAttribute('autoplay');
+      video.removeAttribute('muted');
       video.loop = true;
       video.controls = true;
       video.volume = 1;
@@ -350,6 +426,8 @@ document.querySelectorAll('.smooth-scroll, a[href^="#"]').forEach((link) => {
       video.loop = false;
       video.controls = true;
       video.autoplay = true;
+      video.setAttribute('autoplay', '');
+      video.removeAttribute('muted');
       video.volume = 1;
     }
 
@@ -446,9 +524,6 @@ document.querySelectorAll('.smooth-scroll, a[href^="#"]').forEach((link) => {
 
     observer.observe(video);
 
-    if (video.dataset.videoRole === 'alumnos' && video.closest('.sv-item.is-active')) {
-      video.play().catch(() => {});
-    }
   });
 
   document.addEventListener('visibilitychange', () => {
@@ -707,7 +782,7 @@ if (form) {
     }
 
     submitLeadInBackground({ name, email, phone });
-    window.location.href = 'masterclass.html';
+    window.location.href = '/masterclass';
   });
 }
 
