@@ -1962,7 +1962,7 @@ em,
     perspective: 1200px;
     overscroll-behavior-x: contain;
     scroll-behavior: smooth;
-    touch-action: pan-x;
+    touch-action: auto;
     -webkit-overflow-scrolling: touch;
     mask-image: linear-gradient(90deg, transparent 0, #000 8%, #000 92%, transparent 100%);
   }
@@ -2014,7 +2014,7 @@ em,
     perspective: 1200px;
     overscroll-behavior-x: contain;
     scroll-behavior: smooth;
-    touch-action: pan-x;
+    touch-action: auto;
     -webkit-overflow-scrolling: touch;
     mask-image: linear-gradient(90deg, transparent 0, #000 8%, #000 92%, transparent 100%);
   }

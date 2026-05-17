@@ -551,9 +551,9 @@ function toggleVideoFullscreen(video) {
     if (!video) return;
 
     video.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
       if (window.matchMedia('(max-width: 640px)').matches && !item.classList.contains('is-active')) {
+        event.preventDefault();
+        event.stopPropagation();
         const track = item.parentElement;
         if (track) {
           const targetLeft = item.offsetLeft - (track.clientWidth - item.clientWidth) / 2;
@@ -562,6 +562,8 @@ function toggleVideoFullscreen(video) {
         return;
       }
       if (window.matchMedia('(min-width: 641px)').matches && !item.classList.contains('is-active')) {
+        event.preventDefault();
+        event.stopPropagation();
         const track = item.parentElement;
         if (track) {
           const targetLeft = item.offsetLeft - (track.clientWidth - item.clientWidth) / 2;
@@ -571,7 +573,6 @@ function toggleVideoFullscreen(video) {
         return;
       }
       activateItem(item);
-      toggleVideoFullscreen(video);
     });
   });
 })();
