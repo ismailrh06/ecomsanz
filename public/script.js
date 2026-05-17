@@ -102,6 +102,76 @@ document.querySelectorAll('.smooth-scroll, a[href^="#"]').forEach((link) => {
   });
 });
 
+/* ============================================================
+   ACTIVE SECTION NAV
+   ============================================================ */
+(function () {
+  const navLinks = Array.from(document.querySelectorAll('.home-topnav .topnav-btn[href^="#"]'));
+  if (!navLinks.length) return;
+
+  const items = navLinks
+    .map((link) => {
+      const id = link.getAttribute('href')?.slice(1);
+      const target = id ? document.getElementById(id) : null;
+      return target ? { link, target } : null;
+    })
+    .filter(Boolean);
+
+  if (!items.length) return;
+
+  const setActive = (activeLink) => {
+    navLinks.forEach((link) => {
+      const isActive = link === activeLink;
+      link.classList.toggle('is-active', isActive);
+      if (isActive) {
+        link.setAttribute('aria-current', 'true');
+      } else {
+        link.removeAttribute('aria-current');
+      }
+    });
+  };
+
+  const updateActiveNav = () => {
+    const topbar = document.querySelector('.topbar');
+    const referenceY = (topbar?.offsetHeight || 0) + Math.min(window.innerHeight * 0.24, 180);
+    let activeItem = items[0];
+    let bestScore = Infinity;
+
+    items.forEach((item) => {
+      const rect = item.target.getBoundingClientRect();
+      const visible = rect.bottom > referenceY && rect.top < window.innerHeight * 0.72;
+      if (!visible) return;
+
+      const score = Math.abs(rect.top - referenceY);
+      if (score < bestScore) {
+        bestScore = score;
+        activeItem = item;
+      }
+    });
+
+    setActive(activeItem.link);
+  };
+
+  let ticking = false;
+  const requestUpdate = () => {
+    if (ticking) return;
+    ticking = true;
+    window.requestAnimationFrame(() => {
+      ticking = false;
+      updateActiveNav();
+    });
+  };
+
+  navLinks.forEach((link) => {
+    link.addEventListener('click', () => setActive(link));
+  });
+
+  window.addEventListener('scroll', requestUpdate, { passive: true });
+  window.addEventListener('resize', requestUpdate, { passive: true });
+  window.addEventListener('load', updateActiveNav, { once: true });
+  updateActiveNav();
+})();
+
 function getFullscreenElement() {
   return document.fullscreenElement
     || document.webkitFullscreenElement
@@ -150,39 +220,19 @@ function toggleVideoFullscreen(video) {
    ============================================================ */
 (function () {
   const mobileQuery = window.matchMedia('(max-width: 640px)');
-  if (!mobileQuery.matches) return;
 
-  function setupCarouselTracker(trackSelector, dotSelector, itemSelector) {
+  function setupMobileCarousel(trackSelector, dotSelector, itemSelector, options = {}) {
     const track = document.querySelector(trackSelector);
     const dots = Array.from(document.querySelectorAll(dotSelector));
     const items = Array.from(document.querySelectorAll(itemSelector));
-    if (!track || !dots.length || !items.length) return;
+    if (!track || !items.length) return null;
 
     let activeIndex = 0;
-    let scrollTimeout = null;
+    let rafId = null;
+    let settleTimer = null;
+    let initialized = false;
 
-    const setActive = (index) => {
-      const normalized = Math.max(0, Math.min(index, items.length - 1));
-      activeIndex = normalized;
-      dots.forEach((dot, i) => dot.classList.toggle('active', i === normalized));
-
-      if (trackSelector === '.student-videos-grid') {
-        items.forEach((item, itemIndex) => {
-          const video = item.querySelector('video');
-          if (!video) return;
-          if (itemIndex !== normalized) video.pause();
-        });
-      }
-    };
-
-    const scrollToItem = (index, behavior = 'smooth') => {
-      const item = items[index];
-      if (!item) return;
-      const itemLeft = item.offsetLeft;
-      const targetLeft = itemLeft - (track.clientWidth - item.clientWidth) / 2;
-      track.scrollTo({ left: Math.max(0, targetLeft), behavior });
-      setActive(index);
-    };
+    const clampIndex = (index) => Math.max(0, Math.min(index, items.length - 1));
 
     const getClosestIndex = () => {
       const trackRect = track.getBoundingClientRect();
@@ -195,42 +245,151 @@ function toggleVideoFullscreen(video) {
       }, { distance: Infinity, index: 0 }).index;
     };
 
-    const updateFromScroll = () => {
+    const pauseInactiveVideos = (index) => {
+      if (!options.pauseVideos) return;
+      items.forEach((item, itemIndex) => {
+        if (itemIndex === index) return;
+        item.querySelector('video')?.pause();
+      });
+    };
+
+    const setActive = (index, shouldPause = true) => {
+      const normalized = Math.max(0, Math.min(index, items.length - 1));
+      activeIndex = normalized;
+      dots.forEach((dot, i) => dot.classList.toggle('active', i === normalized));
+      items.forEach((item, itemIndex) => {
+        item.classList.toggle('is-active', itemIndex === normalized);
+        item.classList.toggle('is-before', itemIndex < normalized);
+        item.classList.toggle('is-after', itemIndex > normalized);
+      });
+      if (shouldPause) pauseInactiveVideos(normalized);
+    };
+
+    const updateDepth = () => {
+      if (!mobileQuery.matches) return;
+      const trackRect = track.getBoundingClientRect();
+      const center = trackRect.left + trackRect.width / 2;
+      const maxDistance = Math.max(trackRect.width * 0.52, 1);
+
+      items.forEach((item) => {
+        const rect = item.getBoundingClientRect();
+        const itemCenter = rect.left + rect.width / 2;
+        const raw = (itemCenter - center) / maxDistance;
+        const offset = Math.max(-1, Math.min(1, raw));
+        const abs = Math.abs(offset);
+        const scale = 1 - abs * 0.18;
+        const rotate = offset * -18;
+        const translateY = abs * 14;
+        const opacity = 1 - abs * 0.42;
+        const blur = abs * 1.4;
+
+        item.style.setProperty('--carousel-scale', scale.toFixed(3));
+        item.style.setProperty('--carousel-rotate', `${rotate.toFixed(2)}deg`);
+        item.style.setProperty('--carousel-y', `${translateY.toFixed(2)}px`);
+        item.style.setProperty('--carousel-opacity', opacity.toFixed(3));
+        item.style.setProperty('--carousel-blur', `${blur.toFixed(2)}px`);
+      });
+    };
+
+    const scrollToItem = (index, behavior = 'smooth') => {
+      const item = items[clampIndex(index)];
+      if (!item) return;
+      const targetLeft = item.offsetLeft - (track.clientWidth - item.clientWidth) / 2;
+      track.scrollTo({ left: Math.max(0, targetLeft), behavior });
+      setActive(index, false);
+      queueUpdate();
+    };
+
+    const settleToClosest = () => {
+      if (!mobileQuery.matches) return;
+      const closest = getClosestIndex();
+      setActive(closest);
+      scrollToItem(closest, 'smooth');
+    };
+
+    const update = () => {
+      rafId = null;
+      if (!mobileQuery.matches) return;
+      updateDepth();
       setActive(getClosestIndex());
     };
 
-    const onScrollEnd = () => {
-      const closest = getClosestIndex();
-      setActive(closest);
-    };
+    function queueUpdate() {
+      if (rafId) return;
+      rafId = window.requestAnimationFrame(update);
+    }
 
     const onScroll = () => {
-      updateFromScroll();
-      if (scrollTimeout) window.clearTimeout(scrollTimeout);
-      scrollTimeout = window.setTimeout(onScrollEnd, 120);
+      queueUpdate();
+      if (settleTimer) window.clearTimeout(settleTimer);
+      settleTimer = window.setTimeout(settleToClosest, 130);
+    };
+
+    const enable = () => {
+      if (initialized) return;
+      initialized = true;
+      track.classList.add('mobile-carousel-enhanced');
+      items.forEach((item) => {
+        item.classList.remove('stack-fallback', 'stack-active', 'stack-prev', 'stack-next');
+      });
+      setActive(activeIndex, false);
+      scrollToItem(activeIndex, 'auto');
+      queueUpdate();
+    };
+
+    const disable = () => {
+      initialized = false;
+      track.classList.remove('mobile-carousel-enhanced');
+      items.forEach((item) => {
+        item.classList.remove('is-before', 'is-after');
+        item.style.removeProperty('--carousel-scale');
+        item.style.removeProperty('--carousel-rotate');
+        item.style.removeProperty('--carousel-y');
+        item.style.removeProperty('--carousel-opacity');
+        item.style.removeProperty('--carousel-blur');
+      });
     };
 
     dots.forEach((dot, index) => {
       dot.addEventListener('click', () => scrollToItem(index));
     });
 
-    track.addEventListener('scroll', onScroll, { passive: true });
-    track.addEventListener('touchend', () => {
-      if (scrollTimeout) window.clearTimeout(scrollTimeout);
-      scrollTimeout = window.setTimeout(onScrollEnd, 60);
-    }, { passive: true });
-    track.addEventListener('pointerup', () => {
-      if (scrollTimeout) window.clearTimeout(scrollTimeout);
-      scrollTimeout = window.setTimeout(onScrollEnd, 60);
-    }, { passive: true });
+    items.forEach((item, index) => {
+      item.addEventListener('click', (event) => {
+        if (!mobileQuery.matches || index === activeIndex) return;
+        event.preventDefault();
+        scrollToItem(index);
+      });
+    });
 
-    window.addEventListener('resize', updateFromScroll, { passive: true });
-    window.addEventListener('load', () => setActive(0), { once: true });
-    setActive(0);
+    track.addEventListener('scroll', onScroll, { passive: true });
+    track.addEventListener('touchend', settleToClosest, { passive: true });
+    track.addEventListener('pointerup', settleToClosest, { passive: true });
+    window.addEventListener('resize', queueUpdate, { passive: true });
+    window.addEventListener('load', () => {
+      if (mobileQuery.matches) enable();
+    }, { once: true });
+
+    return { enable, disable, queueUpdate };
   }
 
-  setupCarouselTracker('.proof-masonry', '.proof-dot', '.proof-item');
-  setupCarouselTracker('.student-videos-grid', '.video-dot', '.sv-item');
+  const controllers = [
+    setupMobileCarousel('.proof-masonry', '.proof-dot', '.proof-item'),
+    setupMobileCarousel('.student-videos-grid', '.video-dot', '.sv-item', { pauseVideos: true })
+  ].filter(Boolean);
+
+  const syncMode = () => {
+    controllers.forEach((controller) => {
+      if (mobileQuery.matches) {
+        controller.enable();
+      } else {
+        controller.disable();
+      }
+    });
+  };
+
+  mobileQuery.addEventListener('change', syncMode);
+  syncMode();
 })();
 
 /* ============================================================
@@ -389,9 +548,52 @@ function toggleVideoFullscreen(video) {
     video.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (window.matchMedia('(max-width: 640px)').matches && !item.classList.contains('is-active')) {
+        const track = item.parentElement;
+        if (track) {
+          const targetLeft = item.offsetLeft - (track.clientWidth - item.clientWidth) / 2;
+          track.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+        }
+        return;
+      }
       activateItem(item);
       toggleVideoFullscreen(video);
     });
+  });
+})();
+
+/* ============================================================
+   STUDENT VIDEO PREVIEWS
+   ============================================================ */
+(function () {
+  const videos = Array.from(document.querySelectorAll('video[data-video-role="alumnos"]'));
+  if (!videos.length) return;
+
+  videos.forEach((video) => {
+    const item = video.closest('.sv-item');
+    item?.classList.add('is-loading-preview');
+    video.preload = 'auto';
+
+    const markReady = () => {
+      item?.classList.remove('is-loading-preview');
+      item?.classList.add('has-preview');
+    };
+
+    if (video.readyState >= 2) {
+      markReady();
+      return;
+    }
+
+    video.addEventListener('loadeddata', markReady, { once: true });
+    video.addEventListener('canplay', markReady, { once: true });
+    video.addEventListener('error', () => {
+      item?.classList.remove('is-loading-preview');
+      item?.classList.add('preview-error');
+    }, { once: true });
+
+    try {
+      video.load();
+    } catch (error) {}
   });
 })();
 
@@ -407,11 +609,11 @@ function toggleVideoFullscreen(video) {
 
   const configureVideo = (video) => {
     const role = video.dataset.videoRole;
-    video.preload = 'metadata';
     video.playsInline = true;
     video.setAttribute('playsinline', '');
 
     if (role === 'alumnos') {
+      video.preload = 'auto';
       video.muted = false;
       video.defaultMuted = false;
       video.autoplay = false;
@@ -598,6 +800,15 @@ function toggleVideoFullscreen(video) {
 
   proofImages.forEach((img) => {
     img.addEventListener('click', () => {
+      const item = img.closest('.proof-item');
+      if (window.matchMedia('(max-width: 640px)').matches && item && !item.classList.contains('is-active')) {
+        const track = item.parentElement;
+        if (track) {
+          const targetLeft = item.offsetLeft - (track.clientWidth - item.clientWidth) / 2;
+          track.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+        }
+        return;
+      }
       lbImg.src = img.src;
       overlay.classList.add('open');
       document.body.style.overflow = 'hidden';
@@ -839,3 +1050,76 @@ document.querySelectorAll('.calendly-track').forEach((btn) => {
     }
   });
 });
+
+/* ============================================================
+   MOBILE 3D STACK FALLBACK
+   ============================================================ */
+(function () {
+  const mobileQuery = window.matchMedia('(max-width: 640px)');
+  const supportsScrollTimeline = window.CSS && CSS.supports('animation-timeline: view()');
+  if (supportsScrollTimeline) return;
+
+  const tracks = [
+    {
+      track: document.querySelector('.student-videos-grid'),
+      itemSelector: '.sv-item'
+    },
+    {
+      track: document.querySelector('.proof-masonry'),
+      itemSelector: '.proof-item'
+    }
+  ].filter((entry) => entry.track);
+
+  if (!tracks.length) return;
+  if (tracks.some((entry) => entry.track.classList.contains('mobile-carousel-enhanced'))) return;
+
+  const clearStackClasses = (items) => {
+    items.forEach((item) => {
+      item.classList.remove('stack-active', 'stack-prev', 'stack-next');
+      item.classList.toggle('stack-fallback', mobileQuery.matches);
+    });
+  };
+
+  const updateTrack = ({ track, itemSelector }) => {
+    const items = Array.from(track.querySelectorAll(itemSelector));
+    if (!items.length) return;
+
+    clearStackClasses(items);
+    if (!mobileQuery.matches) return;
+
+    const trackRect = track.getBoundingClientRect();
+    const center = trackRect.left + trackRect.width / 2;
+    const activeIndex = items.reduce((closest, item, index) => {
+      const rect = item.getBoundingClientRect();
+      const itemCenter = rect.left + rect.width / 2;
+      const distance = Math.abs(itemCenter - center);
+      return distance < closest.distance ? { index, distance } : closest;
+    }, { index: 0, distance: Infinity }).index;
+
+    items[activeIndex]?.classList.add('stack-active');
+    items[activeIndex - 1]?.classList.add('stack-prev');
+    items[activeIndex + 1]?.classList.add('stack-next');
+  };
+
+  let ticking = false;
+  const updateAll = () => {
+    ticking = false;
+    tracks.forEach(updateTrack);
+  };
+
+  const requestUpdate = () => {
+    if (ticking) return;
+    ticking = true;
+    window.requestAnimationFrame(updateAll);
+  };
+
+  tracks.forEach(({ track }) => {
+    track.addEventListener('scroll', requestUpdate, { passive: true });
+    track.addEventListener('touchmove', requestUpdate, { passive: true });
+  });
+
+  mobileQuery.addEventListener('change', requestUpdate);
+  window.addEventListener('resize', requestUpdate, { passive: true });
+  window.addEventListener('load', requestUpdate, { once: true });
+  requestUpdate();
+})();
