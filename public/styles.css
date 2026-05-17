@@ -1325,19 +1325,44 @@ em,
 }
 
 .student-videos-grid {
-  display: grid;
-  grid-template-columns: 1fr 1.5fr 1fr;
+  display: flex;
+  gap: 18px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: calc((100% - min(42%, 420px)) / 2);
+  padding: 24px calc((100% - min(42%, 420px)) / 2);
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  scroll-behavior: smooth;
+  perspective: 1200px;
+  align-items: center;
+}
+
+.student-videos-grid::before,
+.student-videos-grid::after {
+  content: "";
+  flex: 0 0 1px;
+}
+
+/*
+  Kept for older snapshots of the design. The flex track above makes
+  the active desktop video truly centerable.
+*/
+.student-videos-grid-legacy {
   gap: 18px;
   align-items: center;
 }
 
 .sv-item {
   position: relative;
+  flex: 0 0 min(42%, 420px);
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 22px;
   opacity: 0.45;
   transform: scale(0.92);
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
   background: var(--surface);
   box-shadow: 0 18px 46px rgba(0, 0, 0, 0.35);
   transition: opacity 0.28s ease, transform 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease, filter 0.28s ease;
@@ -1940,6 +1965,11 @@ em,
     touch-action: pan-x;
     -webkit-overflow-scrolling: touch;
     mask-image: linear-gradient(90deg, transparent 0, #000 8%, #000 92%, transparent 100%);
+  }
+
+  .student-videos-grid::before,
+  .student-videos-grid::after {
+    display: none;
   }
 
   .student-videos-grid.mobile-carousel-enhanced .sv-item,

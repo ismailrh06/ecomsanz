@@ -481,14 +481,17 @@ function toggleVideoFullscreen(video) {
   if (!items.length || !prevButton || !nextButton) return;
 
   let activeIndex = Math.max(0, items.findIndex((item) => item.classList.contains('is-active')));
+  if (activeIndex < 0) activeIndex = 0;
 
-  const centerActiveItem = (behavior = 'smooth') => {
-    const item = items[activeIndex];
+  const centerItem = (index, behavior = 'smooth') => {
+    const item = items[index];
     const track = item?.parentElement;
     if (!item || !track) return;
     const targetLeft = item.offsetLeft - (track.clientWidth - item.clientWidth) / 2;
     track.scrollTo({ left: Math.max(0, targetLeft), behavior });
   };
+
+  const centerActiveItem = (behavior = 'smooth') => centerItem(activeIndex, behavior);
 
   const setActive = (index, shouldCenter = true) => {
     if (!desktopQuery.matches) return;
@@ -511,7 +514,6 @@ function toggleVideoFullscreen(video) {
       if (!desktopQuery.matches || index === activeIndex) return;
       event.preventDefault();
       setActive(index);
-      toggleVideoFullscreen(item.querySelector('video[data-video-role="alumnos"]'));
     });
   });
 
@@ -519,8 +521,11 @@ function toggleVideoFullscreen(video) {
     dot.addEventListener('click', () => setActive(index));
   });
 
-  desktopQuery.addEventListener('change', () => setActive(activeIndex, false));
-  setActive(activeIndex, false);
+  desktopQuery.addEventListener('change', () => {
+    if (desktopQuery.matches) setActive(activeIndex, true);
+  });
+  window.addEventListener('load', () => centerActiveItem('auto'), { once: true });
+  setActive(activeIndex, true);
 })();
 
 /* ============================================================
@@ -554,6 +559,15 @@ function toggleVideoFullscreen(video) {
           const targetLeft = item.offsetLeft - (track.clientWidth - item.clientWidth) / 2;
           track.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
         }
+        return;
+      }
+      if (window.matchMedia('(min-width: 641px)').matches && !item.classList.contains('is-active')) {
+        const track = item.parentElement;
+        if (track) {
+          const targetLeft = item.offsetLeft - (track.clientWidth - item.clientWidth) / 2;
+          track.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+        }
+        activateItem(item);
         return;
       }
       activateItem(item);
