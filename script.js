@@ -374,8 +374,7 @@ function toggleVideoFullscreen(video) {
   }
 
   const controllers = [
-    setupMobileCarousel('.proof-masonry', '.proof-dot', '.proof-item'),
-    setupMobileCarousel('.student-videos-grid', '.video-dot', '.sv-item', { pauseVideos: true })
+    setupMobileCarousel('.proof-masonry', '.proof-dot', '.proof-item')
   ].filter(Boolean);
 
   const syncMode = () => {
@@ -469,112 +468,215 @@ function toggleVideoFullscreen(video) {
 })();
 
 /* ============================================================
-   DESKTOP STUDENT VIDEO PICKER
+   RESPONSIVE STUDENT VIDEO CAROUSEL
    ============================================================ */
 (function () {
-  const desktopQuery = window.matchMedia('(min-width: 641px)');
+  const mobileQuery = window.matchMedia('(max-width: 640px)');
+  const track = document.querySelector('.student-videos-grid');
   const items = Array.from(document.querySelectorAll('.student-videos-grid .sv-item'));
   const dots = Array.from(document.querySelectorAll('.student-videos-section .video-dot'));
   const prevButton = document.querySelector('.video-arrow-prev');
   const nextButton = document.querySelector('.video-arrow-next');
 
-  if (!items.length || !prevButton || !nextButton) return;
+  if (!track || !items.length || !prevButton || !nextButton) return;
 
   let activeIndex = Math.max(0, items.findIndex((item) => item.classList.contains('is-active')));
   if (activeIndex < 0) activeIndex = 0;
 
+  let rafId = null;
+  let settleTimer = null;
+
+  const clampIndex = (index) => Math.max(0, Math.min(index, items.length - 1));
+
+  const getCenteredIndex = () => {
+    const trackRect = track.getBoundingClientRect();
+    const trackCenter = trackRect.left + trackRect.width / 2;
+
+    return items.reduce((closest, item, index) => {
+      const rect = item.getBoundingClientRect();
+      const itemCenter = rect.left + rect.width / 2;
+      const distance = Math.abs(itemCenter - trackCenter);
+      return distance < closest.distance ? { distance, index } : closest;
+    }, { distance: Infinity, index: activeIndex }).index;
+  };
+
+  const pauseInactiveVideos = () => {
+    items.forEach((item, index) => {
+      if (index === activeIndex) return;
+      item.querySelector('video')?.pause();
+    });
+  };
+
+  const getPreviousIndex = (index) => (index - 1 + items.length) % items.length;
+  const getNextIndex = (index) => (index + 1) % items.length;
+
+  const updateDepth = () => {
+    if (!mobileQuery.matches) return;
+
+    const trackRect = track.getBoundingClientRect();
+    const center = trackRect.left + trackRect.width / 2;
+    const maxDistance = Math.max(trackRect.width * 0.52, 1);
+
+    items.forEach((item) => {
+      const rect = item.getBoundingClientRect();
+      const itemCenter = rect.left + rect.width / 2;
+      const offset = Math.max(-1, Math.min(1, (itemCenter - center) / maxDistance));
+      const abs = Math.abs(offset);
+
+      item.style.setProperty('--carousel-scale', (1 - abs * 0.18).toFixed(3));
+      item.style.setProperty('--carousel-rotate', `${(offset * -18).toFixed(2)}deg`);
+      item.style.setProperty('--carousel-y', `${(abs * 14).toFixed(2)}px`);
+      item.style.setProperty('--carousel-opacity', (1 - abs * 0.42).toFixed(3));
+      item.style.setProperty('--carousel-blur', `${(abs * 1.4).toFixed(2)}px`);
+    });
+  };
+
+  const setActive = (index, options = {}) => {
+    const nextIndex = clampIndex(index);
+    activeIndex = nextIndex;
+
+    items.forEach((item, itemIndex) => {
+      const isActive = itemIndex === nextIndex;
+      const isPrev = itemIndex === getPreviousIndex(nextIndex);
+      const isNext = itemIndex === getNextIndex(nextIndex);
+      item.classList.toggle('is-active', isActive);
+      item.classList.toggle('is-prev', !isActive && isPrev);
+      item.classList.toggle('is-next', !isActive && isNext);
+      item.classList.toggle('is-hidden-queue', !isActive && !isPrev && !isNext);
+      item.classList.toggle('is-before', itemIndex < nextIndex);
+      item.classList.toggle('is-after', itemIndex > nextIndex);
+    });
+
+    dots.forEach((dot, dotIndex) => dot.classList.toggle('active', dotIndex === nextIndex));
+    if (options.pause !== false) pauseInactiveVideos();
+  };
+
   const centerItem = (index, behavior = 'smooth') => {
-    const item = items[index];
-    const track = item?.parentElement;
-    if (!item || !track) return;
+    if (!mobileQuery.matches) return;
+    const item = items[clampIndex(index)];
+    if (!item) return;
+
     const targetLeft = item.offsetLeft - (track.clientWidth - item.clientWidth) / 2;
     track.scrollTo({ left: Math.max(0, targetLeft), behavior });
   };
 
-  const centerActiveItem = (behavior = 'smooth') => centerItem(activeIndex, behavior);
-
-  const setActive = (index, shouldCenter = true) => {
-    if (!desktopQuery.matches) return;
-    activeIndex = (index + items.length) % items.length;
-    items.forEach((item, itemIndex) => {
-      const isActive = itemIndex === activeIndex;
-      const video = item.querySelector('video');
-      item.classList.toggle('is-active', isActive);
-      if (!isActive) video?.pause();
-    });
-    dots.forEach((dot, dotIndex) => dot.classList.toggle('active', dotIndex === activeIndex));
-    if (shouldCenter) centerActiveItem();
+  const activateAndCenter = (index, behavior = 'smooth') => {
+    setActive(index);
+    centerItem(activeIndex, behavior);
+    queueUpdate();
   };
 
-  prevButton.addEventListener('click', () => setActive(activeIndex - 1));
-  nextButton.addEventListener('click', () => setActive(activeIndex + 1));
+  const playActiveVideo = () => {
+    const video = items[activeIndex]?.querySelector('video[data-video-role="alumnos"]');
+    if (!video) return;
+    video.currentTime = 0;
+    video.play().catch(() => {});
+  };
 
-  items.forEach((item, index) => {
-    item.addEventListener('click', (event) => {
-      if (!desktopQuery.matches || index === activeIndex) return;
-      event.preventDefault();
-      setActive(index);
+  const updateArrows = () => {
+    if (mobileQuery.matches) {
+      prevButton.disabled = true;
+      nextButton.disabled = true;
+      return;
+    }
+
+    prevButton.disabled = false;
+    nextButton.disabled = false;
+  };
+
+  const update = () => {
+    rafId = null;
+
+    if (mobileQuery.matches) {
+      updateDepth();
+      setActive(getCenteredIndex(), { pause: false });
+    }
+
+    updateArrows();
+  };
+
+  function queueUpdate() {
+    if (rafId) return;
+    rafId = window.requestAnimationFrame(update);
+  }
+
+  const settleMobile = () => {
+    if (!mobileQuery.matches) return;
+    activateAndCenter(getCenteredIndex(), 'smooth');
+  };
+
+  const onScroll = () => {
+    queueUpdate();
+
+    if (!mobileQuery.matches) return;
+    if (settleTimer) window.clearTimeout(settleTimer);
+    settleTimer = window.setTimeout(settleMobile, 130);
+  };
+
+  const syncMode = () => {
+    track.classList.toggle('mobile-carousel-enhanced', mobileQuery.matches);
+
+    if (mobileQuery.matches) {
+      activateAndCenter(activeIndex, 'auto');
+      return;
+    }
+
+    items.forEach((item) => {
+      item.classList.remove('is-before', 'is-after');
+      item.style.removeProperty('--carousel-scale');
+      item.style.removeProperty('--carousel-rotate');
+      item.style.removeProperty('--carousel-y');
+      item.style.removeProperty('--carousel-opacity');
+      item.style.removeProperty('--carousel-blur');
     });
+    activateAndCenter(activeIndex, 'auto');
+  };
+
+  prevButton.addEventListener('click', () => {
+    if (mobileQuery.matches) return;
+    activateAndCenter(getPreviousIndex(activeIndex));
+  });
+
+  nextButton.addEventListener('click', () => {
+    if (mobileQuery.matches) return;
+    activateAndCenter(getNextIndex(activeIndex));
   });
 
   dots.forEach((dot, index) => {
-    dot.addEventListener('click', () => setActive(index));
+    dot.addEventListener('click', () => activateAndCenter(index));
   });
 
-  desktopQuery.addEventListener('change', () => {
-    if (desktopQuery.matches) setActive(activeIndex, true);
-  });
-  window.addEventListener('load', () => centerActiveItem('auto'), { once: true });
-  setActive(activeIndex, true);
-})();
-
-/* ============================================================
-   STUDENT VIDEO FULLSCREEN
-   ============================================================ */
-(function () {
-  const items = Array.from(document.querySelectorAll('.student-videos-grid .sv-item'));
-  if (!items.length) return;
-
-  const dots = Array.from(document.querySelectorAll('.student-videos-section .video-dot'));
-
-  const activateItem = (targetItem) => {
-    items.forEach((item, index) => {
-      const isActive = item === targetItem;
-      item.classList.toggle('is-active', isActive);
-      dots[index]?.classList.toggle('active', isActive);
-      if (!isActive) item.querySelector('video')?.pause();
+  items.forEach((item, index) => {
+    item.addEventListener('click', (event) => {
+      if (event.target.closest('video')) return;
+      if (index === activeIndex) return;
+      event.preventDefault();
+      activateAndCenter(index);
     });
-  };
 
-  items.forEach((item) => {
     const video = item.querySelector('video[data-video-role="alumnos"]');
     if (!video) return;
 
-    video.addEventListener('click', (event) => {
-      if (window.matchMedia('(max-width: 640px)').matches && !item.classList.contains('is-active')) {
-        event.preventDefault();
-        event.stopPropagation();
-        const track = item.parentElement;
-        if (track) {
-          const targetLeft = item.offsetLeft - (track.clientWidth - item.clientWidth) / 2;
-          track.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
-        }
-        return;
-      }
-      if (window.matchMedia('(min-width: 641px)').matches && !item.classList.contains('is-active')) {
-        event.preventDefault();
-        event.stopPropagation();
-        const track = item.parentElement;
-        if (track) {
-          const targetLeft = item.offsetLeft - (track.clientWidth - item.clientWidth) / 2;
-          track.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
-        }
-        activateItem(item);
-        return;
-      }
-      activateItem(item);
+    video.addEventListener('play', () => {
+      if (index === activeIndex) return;
+      activateAndCenter(index);
+    });
+
+    video.addEventListener('ended', () => {
+      if (index !== activeIndex) return;
+      activateAndCenter(getNextIndex(activeIndex));
+      playActiveVideo();
     });
   });
+
+  track.addEventListener('scroll', onScroll, { passive: true });
+  track.addEventListener('touchend', settleMobile, { passive: true });
+  track.addEventListener('pointerup', settleMobile, { passive: true });
+  window.addEventListener('resize', queueUpdate, { passive: true });
+  window.addEventListener('load', () => activateAndCenter(activeIndex, 'auto'), { once: true });
+  mobileQuery.addEventListener('change', syncMode);
+
+  syncMode();
 })();
 
 /* ============================================================
@@ -634,7 +736,7 @@ function toggleVideoFullscreen(video) {
       video.autoplay = false;
       video.removeAttribute('autoplay');
       video.removeAttribute('muted');
-      video.loop = true;
+      video.loop = false;
       video.controls = true;
       video.volume = 1;
     } else if (role === 'vsl') {
